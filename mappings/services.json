@@ -653,7 +653,13 @@
               ]
             }
           }
-        ]
+        ],
+        "properties": {
+            "service_id_hash": {
+                "include_in_text_search": false,
+                "include_in_response": false
+            }
+        }
       },
       "dynamic": "strict",
       "properties": {

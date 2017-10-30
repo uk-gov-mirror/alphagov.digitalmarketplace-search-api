@@ -59,7 +59,7 @@ def highlight_clause():
     highlights["fields"] = {}
 
     # Get all fields searched and allow non-matches to a max of the searchSummary limit
-    for field in app.mapping.get_services_mapping().text_fields_set:
+    for field in app.mapping.get_services_mapping().text_search_fields:
         highlights["fields"][field] = {
             "number_of_fragments": 0,
             "no_match_size": 500
@@ -108,7 +108,7 @@ def multi_match_clause(keywords):
     return {
         "simple_query_string": {
             "query": keywords,
-            "fields": app.mapping.get_services_mapping().text_fields,
+            "fields": app.mapping.get_services_mapping().text_search_fields,
             "default_operator": "and",
             "flags": "OR|AND|NOT|PHRASE|ESCAPE|WHITESPACE"
         }

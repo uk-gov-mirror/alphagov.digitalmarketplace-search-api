@@ -36,7 +36,7 @@ def convert_es_results(results, query_args):
 
     for service in results["hits"]["hits"]:
         result = {}
-        for field in app.mapping.get_services_mapping().text_fields:
+        for field in app.mapping.get_services_mapping().response_fields:
             append_field_if_present(result, service["_source"], field)
 
         append_field_if_present(result, service, "highlight")

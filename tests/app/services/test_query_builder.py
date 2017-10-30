@@ -72,7 +72,7 @@ def test_should_make_multi_match_query_if_keywords_supplied(services_mapping):
     query_string_clause = query["query"]["simple_query_string"]
     assert_equal(query_string_clause["query"], keywords)
     assert_equal(query_string_clause["default_operator"], "and")
-    assert_equal(set(query_string_clause["fields"]), services_mapping.text_fields_set)
+    assert_equal(frozenset(query_string_clause["fields"]), services_mapping.text_search_fields_set)
 
 
 @pytest.mark.parametrize("query,expected", (
@@ -114,7 +114,7 @@ def test_should_have_filtered_root_element_and_match_keywords(services_mapping):
     query_string_clause = query["simple_query_string"]
     assert_equal(query_string_clause["query"], "some keywords")
     assert_equal(query_string_clause["default_operator"], "and")
-    assert_equal(set(query_string_clause["fields"]), services_mapping.text_fields_set)
+    assert_equal(frozenset(query_string_clause["fields"]), services_mapping.text_search_fields_set)
 
 
 def test_should_have_filtered_term_service_types_clause():
