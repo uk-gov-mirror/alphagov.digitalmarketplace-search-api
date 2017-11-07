@@ -30,6 +30,8 @@ def _convert_es_index_status(index_name, status_response, info_response):
 
 
 def _convert_es_result(mapping, es_result):
+    # generate outgoing result dict only including es_result keys whose un-prefixed field name is in
+    # mapping.response_fields, removing prefix in the process
     return {
         maybe_name[0]: value
         for (prefix, *maybe_name), value in (
@@ -48,11 +50,11 @@ def convert_es_results(results, query_args):
         if 'idOnly' in query_args:
             services.append({"id": service["_id"]})
         else:
-            # populate result from service["_source"] object items whose un-prefixed field name is in
-            # mapping.response_fields, removing prefix in the process
+            # populate result from service["_source"] object
             result = _convert_es_result(mapping, service["_source"])
 
             if "highlight" in service:
+                # perform the same conversion for any highlight terms
                 result["highlight"] = _convert_es_result(mapping, service["highlight"])
 
             services.append(result)

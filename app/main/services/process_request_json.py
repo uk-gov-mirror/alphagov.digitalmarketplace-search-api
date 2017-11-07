@@ -69,6 +69,9 @@ def convert_request_json_into_index_json(request_json):
         for transformation_type, transformation_arguments in transformation.items():
             TRANSFORMATION_PROCESSORS[transformation_type](transformation_arguments, request_json)
 
+    # build a dict: for each key/value in the request_json, look up mapping.prefixes_by_field to see how many
+    # differently-prefixed variants that field has in the mapping and copy value verbatim to all those keys. it could
+    # of course have no representation in the mapping, in which case it would be ignored.
     return dict(chain.from_iterable(
         (
             ("_".join((prefix, key)), value)
