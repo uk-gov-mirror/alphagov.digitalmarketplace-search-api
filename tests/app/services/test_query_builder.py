@@ -3,7 +3,6 @@ from nose.tools import (
     assert_false, assert_true
 )
 import pytest
-import app.mapping
 from app.main.services.query_builder import construct_query, is_filtered
 from app.main.services.query_builder import (
     field_is_or_filter,
@@ -194,17 +193,17 @@ def test_highlight_block_sets_encoder_to_html():
 def test_service_id_hash_not_in_searched_fields():
     query = construct_query(build_query_params(keywords="some keywords"))
 
-    assert app.mapping.SERVICE_ID_HASH_FIELD_NAME not in query['query']['simple_query_string']['fields']
+    assert "dmsortonly_serviceIdHash" not in query['query']['simple_query_string']['fields']
 
     query = construct_query(
         build_query_params(filters={'serviceTypes': ["serviceType1"]}))
 
-    assert app.mapping.SERVICE_ID_HASH_FIELD_NAME not in query['highlight']['fields']
+    assert "dmsortonly_serviceIdHash" not in query['highlight']['fields']
 
 
 def test_sort_results_by_score_and_service_id_hash():
     query = construct_query(build_query_params(keywords="some keywords"))
-    assert query['sort'] == ['_score', {"_".join(("dmsortonly", app.mapping.SERVICE_ID_HASH_FIELD_NAME)): 'desc'}]
+    assert query['sort'] == ['_score', {"dmsortonly_serviceIdHash": 'desc'}]
 
 
 @pytest.mark.parametrize('example, expected', (
