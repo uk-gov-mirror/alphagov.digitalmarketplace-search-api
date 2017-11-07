@@ -1,8 +1,10 @@
-from .conversions import strip_and_lowercase
+from itertools import chain
+
 import app.mapping
 
 
 def construct_query(query_args, aggregations=[], page_size=100):
+    mapping = app.mapping.get_services_mapping()
     if not is_filtered(query_args):
         query = {
             "query": build_keywords_query(query_args)
@@ -26,20 +28,31 @@ def construct_query(query_args, aggregations=[], page_size=100):
 
     if aggregations:
         aggregations = set(aggregations)
-        missing_aggregations = aggregations.difference(app.mapping.get_services_mapping().aggregatable_fields)
+        missing_aggregations = aggregations.difference(
+            mapping.fields_by_prefix.get(mapping.aggregatable_field_prefix) or frozenset()
+        )
         if missing_aggregations:
             raise ValueError("Aggregations for `{}` are not supported.".format(', '.join(missing_aggregations)))
 
         query["size"] = 0  # We don't want any services returned, just aggregations
-        query['aggregations'] = {x: {"terms": {"field": "{}.raw".format(x), "size": 999999}} for x in aggregations}
+        query['aggregations'] = {
+            x: {"terms": {"field": "_".join((mapping.aggregatable_field_prefix, x)), "size": 999999}}
+            for x in aggregations
+        }
 
     else:
         if 'idOnly' in query_args:
-            query['_source'] = ['id']
+            query['_source'] = False
 
         else:
             query["highlight"] = highlight_clause()
-            query['sort'] = ['_score', {app.mapping.SERVICE_ID_HASH_FIELD_NAME: 'desc'}]
+            query['sort'] = list(chain(
+                ('_score',),
+                (
+                    {"_".join((mapping.sort_only_field_prefix, name)): 'desc'}
+                    for name in sorted(mapping.fields_by_prefix.get(mapping.sort_only_field_prefix))
+                )
+            ))
 
     if "page" in query_args:
         try:
@@ -51,6 +64,7 @@ def construct_query(query_args, aggregations=[], page_size=100):
 
 
 def highlight_clause():
+    mapping = app.mapping.get_services_mapping()
     highlights = {
         "encoder": "html",
         "pre_tags": ["<mark class='search-result-highlighted-text'>"],
@@ -59,8 +73,8 @@ def highlight_clause():
     highlights["fields"] = {}
 
     # Get all fields searched and allow non-matches to a max of the searchSummary limit
-    for field in app.mapping.get_services_mapping().text_search_fields:
-        highlights["fields"][field] = {
+    for field in mapping.fields_by_prefix.get(mapping.text_search_field_prefix, ()):
+        highlights["fields"]["_".join((mapping.text_search_field_prefix, field))] = {
             "number_of_fragments": 0,
             "no_match_size": 500
         }
@@ -69,8 +83,12 @@ def highlight_clause():
 
 
 def is_filtered(query_args):
-    return len(set(query_args.keys()).intersection(
-        ["filter_" + field for field in app.mapping.get_services_mapping().filter_fields_set])) > 0
+    mapping = app.mapping.get_services_mapping()
+    return bool(frozenset(
+        maybe_name[0]
+        for prefix, *maybe_name in (arg_key.split("_", 1) for arg_key in query_args.keys())
+        if prefix == "filter" and maybe_name  # maybe_name could be an empty seq if no underscores were found
+    ) & (mapping.fields_by_prefix.get(mapping.filter_field_prefix) or frozenset()))
 
 
 def build_keywords_query(query_args):
@@ -105,10 +123,14 @@ def multi_match_clause(keywords):
     "simple_query_string" doesn't support "use_dis_max" flag.
 
     """
+    mapping = app.mapping.get_services_mapping()
     return {
         "simple_query_string": {
             "query": keywords,
-            "fields": app.mapping.get_services_mapping().text_search_fields,
+            "fields": [
+                "_".join((mapping.text_search_field_prefix, field_name))
+                for field_name in mapping.fields_by_prefix.get(mapping.text_search_field_prefix, ())
+            ],
             "default_operator": "and",
             "flags": "OR|AND|NOT|PHRASE|ESCAPE|WHITESPACE"
         }
@@ -125,10 +147,11 @@ def field_is_or_filter(field_values):
     return (len(field_values) == 1) and ("," in field_values[0])
 
 
-def field_filters(field_name, field_values):
+def field_filters(arg_field_name, field_values):
     """Build a list of Elasticsearch filters for the given field."""
+    mapping = app.mapping.get_services_mapping()
+    field_name = "_".join((mapping.filter_field_prefix, arg_field_name))
     if field_is_or_filter(field_values):
-        field_values = field_values[0].split(",")
         return or_field_filters(field_name, field_values)
     else:
         return and_field_filters(field_name, field_values)
@@ -148,12 +171,13 @@ def or_field_filters(field_name, field_values):
     (https://www.elastic.co/guide/en/elasticsearch/reference/1.6/query-dsl-terms-filter.html)
 
     """
-    terms = [strip_and_lowercase(value) for value in field_values]
-    return [{
-        "terms": {
-            field_name: terms
-        }
-    }]
+    return [
+        {
+            "terms": {
+                field_name: field_values[0].split(","),
+            },
+        },
+    ]
 
 
 def and_field_filters(field_name, field_values):
@@ -162,11 +186,14 @@ def and_field_filters(field_name, field_values):
     Returns a list of "term" filters: one for each of the filter values.
 
     """
-    return [{
-        "term": {
-            field_name: strip_and_lowercase(value)
+    return [
+        {
+            "term": {
+                field_name: value,
+            }
         }
-    } for value in field_values]
+        for value in field_values
+    ]
 
 
 def filter_clause(query_args):
@@ -187,16 +214,15 @@ def filter_clause(query_args):
     just any one of them.
 
     """
-
-    query_filters = []
-    for field, values in query_args.lists():
-        if field.startswith("filter"):
-            query_filters.extend(field_filters(field, values))
-
-    filters = {
+    return {
         "bool": {
-            "must": query_filters
-        }
+            "must": list(chain.from_iterable(
+                field_filters(maybe_name[0], values)
+                for (prefix, *maybe_name), values in (
+                    (arg_key.split("_", 1), values)
+                    for arg_key, values in query_args.lists()
+                )
+                if prefix == "filter" and maybe_name  # maybe_name could be an empty seq if no underscores were found
+            )),
+        },
     }
-
-    return filters
