@@ -1,0 +1,125 @@
+{
+  "settings": {
+    "analysis": {
+      "char_filter": {
+        "nonalpha_removal": {
+          "type": "pattern_replace",
+          "pattern": "\\W+",
+          "replacement": ""
+        }
+      },
+      "normalizer": {
+        "filter_normalizer": {
+          "type": "custom",
+          "char_filter": [
+            "nonalpha_removal"
+          ],
+          "filter": [
+            "lowercase"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "briefs": {
+      "_meta": {
+        "dm_sort_clause": [
+          "sortonly_idHash",
+          "sortonly_publishedAt"
+        ],
+        "transformations": [
+          {
+            "hash_to": {
+              "field": "id",
+              "target_field": "idHash"
+            }
+          }
+        ]
+      },
+      "dynamic": "strict",
+      "properties": {
+        "dmtext_id": {
+          "type": "keyword"
+        },
+        "sortonly_idHash": {
+          "type": "keyword"
+        },
+        "sortonly_publishedAt": {
+          "type": "date"
+        },
+        "dmfilter_lot": {
+          "type": "keyword",
+          "normalizer": "filter_normalizer"
+        },
+        "dmtext_lot": {
+          "type": "keyword"
+        },
+        "dmtext_withdrawnAt": {
+          "type": "keyword"
+        },
+        "dmtext_publishedAt": {
+          "type": "keyword"
+        },
+        "dmtext_applicationsClosedAt": {
+          "type": "keyword"
+        },
+        "dmtext_cancelledAt": {
+          "type": "keyword"
+        },
+        "dmtext_unsuccessfulAt": {
+          "type": "keyword"
+        },
+        "dmtext_awardedBriefResponseId": {
+          "type": "keyword"
+        },
+        "dmtext_organisation": {
+          "type": "keyword"
+        },
+        "dmtext_title": {
+          "type": "keyword"
+        },
+        "dmtext_specialistRole": {
+          "type": "keyword"
+        },
+        "dmtext_summary": {
+          "type": "keyword"
+        },
+        "dmtext_locationOutcomes": {
+          "type": "keyword"
+        },
+        "dmtext_locationParticipants": {
+          "type": "keyword"
+        },
+        "dmtext_locationSpecialists": {
+          "type": "keyword"
+        },
+        "dmtext_location": {
+          "type": "keyword"
+        },
+        "dmfilter_locationOutcomes": {
+          "type": "keyword",
+          "normalizer": "filter_normalizer",
+          "copy_to": ["dmfilter_location", "dmtext_location"]
+        },
+        "dmfilter_locationParticipants": {
+          "type": "keyword",
+          "normalizer": "filter_normalizer",
+          "copy_to": ["dmfilter_location", "dmtext_location"]
+        },
+        "dmfilter_locationSpecialists": {
+          "type": "keyword",
+          "normalizer": "filter_normalizer",
+          "copy_to": ["dmfilter_location", "dmtext_location"]
+        },
+        "dmfilter_location": {
+          "type": "keyword",
+          "normalizer": "filter_normalizer"
+        },
+        "dmtext_location": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}
